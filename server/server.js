@@ -63,7 +63,7 @@ app.use(express.json())
 
 // Default Route
 app.get('/', (req, res) => res.send("API working"))
-app.use('/api/educator' , express.json(), educatorRouter)
+app.use('/api/educator', educatorRouter)
 
 // Only listen locally — on Vercel the exported app is invoked as a serverless function
 if (!process.env.VERCEL) {
