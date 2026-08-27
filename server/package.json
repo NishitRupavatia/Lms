@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
-  "type":"module",
+  "type": "module",
   "scripts": {
     "server": "nodemon server.js",
-    "start" : "node server.js"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -19,8 +19,13 @@
     "express": "^5.2.1",
     "mongoose": "^9.9.4",
     "multer": "^2.2.0",
-    "nodemon": "^3.1.14",
     "stripe": "^22.5.0",
     "svix": "^1.42.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "engines": {
+    "node": ">=18.x"
   }
 }
