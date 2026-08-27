@@ -1,4 +1,5 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import cors from 'cors'
 import 'dotenv/config'
 import connectDB from './configs/mongodb.js'
@@ -9,6 +10,32 @@ const app = express()
 // CORS Middleware
 app.use(cors())
 
+// Strip any credentials before an error message is returned to the client
+const safeMessage = (error) =>
+    String(error?.message || error).replace(/\/\/[^@\s]+@/g, '//<credentials>@')
+
+// Diagnostics: reports configuration state without exposing any secret values
+app.get('/health', async (req, res) => {
+    const state = ['disconnected', 'connected', 'connecting', 'disconnecting']
+    let dbError = null
+
+    try {
+        await connectDB()
+    } catch (error) {
+        dbError = safeMessage(error)
+    }
+
+    res.json({
+        ok: !dbError,
+        env: {
+            MONGODB_URI: !!process.env.MONGODB_URI,
+            CLERK_WEBHOOK_SECRET: !!process.env.CLERK_WEBHOOK_SECRET,
+        },
+        mongoose: state[mongoose.connection.readyState] ?? mongoose.connection.readyState,
+        dbError,
+    })
+})
+
 // Ensure MongoDB is connected before any route runs.
 // On serverless the connection is cached, so this is a no-op after the cold start.
 app.use(async (req, res, next) => {
@@ -17,7 +44,11 @@ app.use(async (req, res, next) => {
         next()
     } catch (error) {
         console.error('Database connection error:', error)
-        res.status(500).json({ success: false, message: 'Database connection failed' })
+        res.status(500).json({
+            success: false,
+            message: 'Database connection failed',
+            reason: safeMessage(error),
+        })
     }
 })
 

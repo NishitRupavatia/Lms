@@ -18,11 +18,12 @@ const connectDB = async () => {
     if (!cached.promise) {
         mongoose.connection.on("connected", () => console.log("Database connected"));
 
-        cached.promise = mongoose
-            .connect(`${process.env.MONGODB_URI}/lms`, {
-                bufferCommands: false,
-            })
-            .then((m) => m);
+        cached.promise = mongoose.connect(`${process.env.MONGODB_URI}/lms`, {
+            bufferCommands: false,
+            // Fail fast with a readable error instead of hanging until the
+            // serverless function itself times out.
+            serverSelectionTimeoutMS: 8000,
+        });
     }
 
     try {
