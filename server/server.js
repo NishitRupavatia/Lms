@@ -4,11 +4,14 @@ import cors from 'cors'
 import 'dotenv/config'
 import connectDB from './configs/mongodb.js'
 import { clerkWebHooks } from './controllers/webhooks.js'
+import educatorRouter from './routes/educatorRoutes.js'
+import { clerkMiddleware } from '@clerk/express'
 
 const app = express()
 
 // CORS Middleware
 app.use(cors())
+app.use(clerkMiddleware())
 
 // Strip any credentials before an error message is returned to the client
 const safeMessage = (error) =>
@@ -60,6 +63,7 @@ app.use(express.json())
 
 // Default Route
 app.get('/', (req, res) => res.send("API working"))
+app.use('/api/educator' , express.json(), educatorRouter)
 
 // Only listen locally — on Vercel the exported app is invoked as a serverless function
 if (!process.env.VERCEL) {
