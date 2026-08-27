@@ -9,6 +9,7 @@ export const AppContext=createContext();
 export const AppContextProvider= (props)=>{
 
     const currency=import.meta.env.VITE_CURRENCY
+    const backendUrl=import.meta.env.VITE_BACKEND_URL
 
     const navigate= useNavigate()
 
@@ -16,7 +17,8 @@ export const AppContextProvider= (props)=>{
     const {user} =useUser()
 
     const [allCourses, setAllCourses]= useState([])
-    const [isEducator, setIsEducator]= useState(true)
+    // Derived from Clerk's publicMetadata, which the backend sets via /api/educator/update-role
+    const isEducator = user?.publicMetadata?.role === 'educator'
     const [enrolledCourses, setEnrolledCourses]= useState([])
 
     //fetch all courses
@@ -71,17 +73,29 @@ export const AppContextProvider= (props)=>{
        fetchUserEnrolledCourses()
     },[])
 
-    const logToken=async ()=>{
-        console.log(await getToken());
+    // Ask the backend to promote the signed-in user to educator.
+    // The Clerk session token must be forwarded, otherwise the API replies 401.
+    const becomeEducator=async ()=>{
+        try{
+            const token=await getToken()
+            const res=await fetch(`${backendUrl}/api/educator/update-role`,{
+                headers:{ Authorization:`Bearer ${token}` }
+            })
+            const data=await res.json()
+            if(data.success){
+                // Refresh the local Clerk user so publicMetadata.role is visible immediately
+                await user.reload()
+                return true
+            }
+            console.error('becomeEducator failed:',data.message)
+            return false
+        }catch(error){
+            console.error('becomeEducator error:',error)
+            return false
+        }
     }
-
-    useEffect(()=>{
-       if(user){
-         logToken()
-       }
-    },[user])
     const value={
-        currency, allCourses, navigate, calculateRating, isEducator, setIsEducator,calculateChapterTime,calculateCourseDuration,calculateNoOfLectures,enrolledCourses,fetchUserEnrolledCourses
+        currency, backendUrl, allCourses, navigate, calculateRating, isEducator, becomeEducator, getToken,calculateChapterTime,calculateCourseDuration,calculateNoOfLectures,enrolledCourses,fetchUserEnrolledCourses
     };
     return (
         <AppContext.Provider value={value}>
