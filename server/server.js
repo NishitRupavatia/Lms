@@ -3,9 +3,12 @@ import mongoose from 'mongoose'
 import cors from 'cors'
 import 'dotenv/config'
 import connectDB from './configs/mongodb.js'
-import { clerkWebHooks } from './controllers/webhooks.js'
+import { clerkWebHooks, stripeWebhooks } from './controllers/webhooks.js'
 import educatorRouter from './routes/educatorRoutes.js'
 import { clerkMiddleware } from '@clerk/express'
+import connectCloudinary from './configs/cloudinary.js'
+import courseRouter from './routes/courseRoute.js'
+import userRouter from './routes/userRoutes.js'
 
 const app = express()
 
@@ -39,6 +42,8 @@ app.get('/health', async (req, res) => {
     })
 })
 
+await connectCloudinary()
+
 // Ensure MongoDB is connected before any route runs.
 // On serverless the connection is cached, so this is a no-op after the cold start.
 app.use(async (req, res, next) => {
@@ -64,7 +69,9 @@ app.use(express.json())
 // Default Route
 app.get('/', (req, res) => res.send("API working"))
 app.use('/api/educator', educatorRouter)
-
+app.use('/api/course',express.json(),courseRouter)
+app.use('/api/user',express.json(),userRouter)
+app.post('/stripe',express.raw({type:'application/json'}),stripeWebhooks)
 // Only listen locally — on Vercel the exported app is invoked as a serverless function
 if (!process.env.VERCEL) {
     const PORT = process.env.PORT || 5000
