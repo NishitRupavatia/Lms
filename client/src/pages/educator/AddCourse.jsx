@@ -1,12 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react'
-import uniqid from 'uniqid'
+import React, { useContext, useEffect, useRef, useState } from 'react'
+import axios from 'axios'
+import { toast } from 'react-toastify'
+import uniqid from '../../utils/uniqid'
 import Quill from 'quill' 
 import 'quill/dist/quill.snow.css'
 import { assets } from '../../assets/assets'
+import { AppContext } from '../../context/AppContext'
 
 const AddCourse = () => {
   const quillRef = useRef(null)
   const editorRef = useRef(null)
+
+  const { backendUrl, authHeaders, refreshCourses } = useContext(AppContext)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [courseTitle, setCourseTitle] = useState('')
   const [coursePrice, setCoursePrice] = useState(0)
@@ -104,17 +110,82 @@ const AddCourse = () => {
   }
 
   // Form Submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (isSubmitting) return
+
+    if (!image) {
+      return toast.error('Please select a course thumbnail')
+    }
+
+    const description = quillRef.current ? quillRef.current.root.innerHTML : ''
+
+    // Quill leaves an empty paragraph behind, so check the text instead
+    if (!quillRef.current || quillRef.current.getText().trim().length === 0) {
+      return toast.error('Please add a course description')
+    }
+
+    if (chapters.length === 0) {
+      return toast.error('Please add at least one chapter')
+    }
+
+    // Shape the form state into exactly what the Course schema expects:
+    // `courseContent` chapters, numeric durations, and explicit ordering.
     const courseData = {
       courseTitle,
-      coursePrice,
-      discount,
-      image,
-      courseDescription: quillRef.current ? quillRef.current.root.innerHTML : '',
-      chapters,
+      courseDescription: description,
+      coursePrice: Number(coursePrice),
+      discount: Number(discount),
+      courseContent: chapters.map((chapter, chapterIndex) => ({
+        chapterId: chapter.chapterId,
+        chapterOrder: chapterIndex + 1,
+        chapterTitle: chapter.chapterTitle,
+        chapterContent: chapter.chapterContent.map((lecture, lectureIndex) => ({
+          lectureId: lecture.lectureId,
+          lectureTitle: lecture.lectureTitle,
+          lectureDuration: Number(lecture.lectureDuration) || 0,
+          lectureUrl: lecture.lectureUrl,
+          isPreviewFree: Boolean(lecture.isPreviewFree),
+          lectureOrder: lectureIndex + 1,
+        })),
+      })),
     }
-    console.log('Course Data Submitted:', courseData)
+
+    // multipart/form-data: the thumbnail travels alongside the JSON payload
+    const formData = new FormData()
+    formData.append('courseData', JSON.stringify(courseData))
+    formData.append('image', image)
+
+    setIsSubmitting(true)
+
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/educator/add-course`,
+        formData,
+        await authHeaders()
+      )
+
+      if (data.success) {
+        toast.success(data.message)
+
+        setCourseTitle('')
+        setCoursePrice(0)
+        setDiscount(0)
+        setImage(null)
+        setChapters([])
+        quillRef.current.setContents([])
+
+        // Keep the shared course list in step with what was just published
+        refreshCourses()
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message)
+    }
+
+    setIsSubmitting(false)
   }
 
   return (
@@ -244,7 +315,7 @@ const AddCourse = () => {
 
           {/* Add Lecture Modal */}
           {showPopup && (
-            <div className='fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50'>
+            <div className='fixed inset-0 flex items-center justify-center bg-gray-800/50 z-50'>
               <div className="bg-white text-gray-700 p-4 rounded relative w-full max-w-80">
                 <h2 className="text-lg font-semibold mb-4">Add Lecture</h2>
 
@@ -308,8 +379,12 @@ const AddCourse = () => {
         </div>
 
         {/* Submit Button */}
-        <button type="submit" className='bg-black text-white w-max py-2.5 px-8 rounded my-4'>
-          ADD
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className='bg-black text-white w-max py-2.5 px-8 rounded my-4 disabled:bg-gray-500'
+        >
+          {isSubmitting ? 'ADDING...' : 'ADD'}
         </button>
       </form>
     </div>

@@ -34,8 +34,9 @@ const courseSchema = new mongoose.Schema({
         {type:String,ref:'User'}
     ],
 
-},{timeseries:true,minimize:false})
+},{timestamps:true,minimize:false})
 
-const Course=mongoose.model('Course',courseSchema)
+// Reuse the compiled model across serverless invocations (avoids OverwriteModelError)
+const Course = mongoose.models.Course || mongoose.model('Course', courseSchema)
 
 export default Course

@@ -1,5 +1,8 @@
-import React, { useEffect, useState, useContext } from 'react'
+import React, { useEffect, useMemo, useState, useContext } from 'react'
 import { useParams } from 'react-router-dom'
+import { useUser, useClerk } from '@clerk/react'
+import axios from 'axios'
+import { toast } from 'react-toastify'
 import { AppContext } from '../../context/AppContext'
 import Loading from '../../components/student/Loading'
 import { assets } from '../../assets/assets'
@@ -11,13 +14,13 @@ const CourseDetails = () => {
 
   const { id } = useParams()
 
-  const [courseData, setCourseData] = useState(null)
   const [openSections, setOpenSections] = useState({})
-  const [isAlreadyEnrolled, setIsAlreadyEnrolled] = useState(false)
   const [playerData, setPlayerData] = useState(null)
 
   const {
-    allCourses,
+    backendUrl,
+    enrolledCourses,
+    authHeaders,
     calculateRating,
     calculateChapterTime,
     calculateCourseDuration,
@@ -25,18 +28,76 @@ const CourseDetails = () => {
     currency
   } = useContext(AppContext)
 
+  const { user } = useUser()
+  const { openSignIn } = useClerk()
 
-  // Fetch course data
-  const fetchCourseData = () => {
-    const findCourse = allCourses.find(course => course._id === id)
-    setCourseData(findCourse)
-  }
+  const [courseData, setCourseData] = useState(null)
+  const [isEnrolling, setIsEnrolling] = useState(false)
 
-
+  // The course list endpoint strips courseContent and enrolledStudents, so the
+  // detail page has to load the full document from /api/course/:id.
   useEffect(() => {
-    fetchCourseData()
-  }, [allCourses, id])
+    let ignore = false
 
+    const loadCourse = async () => {
+      try {
+        const { data } = await axios.get(`${backendUrl}/api/course/${id}`)
+
+        if (ignore) return
+
+        if (data.success) {
+          setCourseData(data.courseData)
+        } else {
+          toast.error(data.message)
+        }
+      } catch (error) {
+        if (!ignore) toast.error(error.message)
+      }
+    }
+
+    loadCourse()
+
+    return () => { ignore = true }
+  }, [backendUrl, id])
+
+  const isAlreadyEnrolled = useMemo(
+    () => Boolean(enrolledCourses?.some(course => course._id === id)),
+    [enrolledCourses, id]
+  )
+
+  // Send the student to Stripe Checkout. The session is created server-side so
+  // the price can never be tampered with from the browser.
+  const enrollCourse = async () => {
+    if (!user) {
+      return openSignIn()
+    }
+
+    if (isAlreadyEnrolled) {
+      return toast.warn('Already enrolled')
+    }
+
+    setIsEnrolling(true)
+
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/user/purchase`,
+        { courseId: courseData._id },
+        await authHeaders()
+      )
+
+      if (data.success) {
+        // Full page redirect — Stripe Checkout is hosted on their domain
+        window.location.replace(data.session_url)
+        return
+      }
+
+      toast.error(data.message)
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message)
+    }
+
+    setIsEnrolling(false)
+  }
 
   // Open / close chapter
   const toggleSection = (index) => {
@@ -68,7 +129,7 @@ const CourseDetails = () => {
 
       return null
 
-    } catch (error) {
+    } catch {
 
       console.error('Invalid YouTube URL:', url)
 
@@ -138,8 +199,8 @@ const CourseDetails = () => {
             </p>
 
             <p>
-              {courseData.enrolledStudents.length}{' '}
-              {courseData.enrolledStudents.length > 1
+              {courseData.enrolledStudents?.length ?? 0}{' '}
+              {(courseData.enrolledStudents?.length ?? 0) > 1
                 ? 'students'
                 : 'student'}
             </p>
@@ -153,7 +214,7 @@ const CourseDetails = () => {
             Course by{' '}
 
             <span className='text-blue-600 underline'>
-              Nishit Rupavatia
+              {courseData.educator?.name || 'Unknown Educator'}
             </span>
 
           </p>
@@ -169,7 +230,7 @@ const CourseDetails = () => {
 
             <div className='pt-5'>
 
-              {courseData.courseContent.map((chapter, index) => (
+              {courseData.courseContent?.map((chapter, index) => (
 
                 <div
                   key={index}
@@ -483,11 +544,17 @@ const CourseDetails = () => {
 
 
             {/* Enroll Button */}
-            <button className='md:mt-6 mt-4 w-full py-3 rounded bg-blue-600 text-white font-medium'>
+            <button
+              onClick={enrollCourse}
+              disabled={isAlreadyEnrolled || isEnrolling}
+              className='md:mt-6 mt-4 w-full py-3 rounded bg-blue-600 text-white font-medium disabled:bg-blue-400 disabled:cursor-not-allowed'
+            >
 
               {isAlreadyEnrolled
                 ? 'Already Enrolled'
-                : 'Enroll Now'}
+                : isEnrolling
+                  ? 'Redirecting...'
+                  : 'Enroll Now'}
 
             </button>
 

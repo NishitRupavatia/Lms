@@ -1,4 +1,4 @@
-import React, { useContext, useEffect,useState } from 'react'
+import React, { useContext, useMemo } from 'react'
 import { AppContext } from '../../context/AppContext'
 import { useParams } from 'react-router-dom'
 import SearchBar from '../../components/student/SearchBar'
@@ -10,19 +10,16 @@ const CoursesList = () => {
 
   const {navigate,allCourses}= useContext(AppContext)
   const {input}=useParams()
-  const [filteredCourse,setFilteredCourse]=useState([])
+  // Derived during render — storing this in state would only add a second pass
+  const filteredCourse = useMemo(() => {
+    if (!allCourses || allCourses.length === 0) return []
 
-  useEffect(()=>{
-     if(allCourses && allCourses.length>0){
-      const tempCourses= allCourses.slice()
+    if (!input) return allCourses.slice()
 
-      input?
-       setFilteredCourse(tempCourses.filter(
-        item=>item.courseTitle.toLowerCase().includes(input.toLowerCase())
-       ))
-      : setFilteredCourse(tempCourses)
-     } 
-  },[allCourses,input])
+    return allCourses.filter(
+      item => item.courseTitle.toLowerCase().includes(input.toLowerCase())
+    )
+  }, [allCourses, input])
   
     return(
       <>
@@ -39,7 +36,7 @@ const CoursesList = () => {
 
         { input && <div className='inline-flex items-center gap-4 px-4 py-2 border mt-8 -mb-8 text-gray-600'>
             <p>{input}</p>
-            <img src={assets.cross_icon} alt="" className='cursor-pointer' onClick={()=>navigate('course-list')} />
+            <img src={assets.cross_icon} alt="" className='cursor-pointer' onClick={()=>navigate('/course-list')} />
           </div>
         }
         <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 my-16 gap-3 px-2 md:p-0'>

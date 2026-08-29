@@ -1,8 +1,17 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 
 const Rating = ({ initialRating, onRate }) => {
 
   const [rating, setRating] = useState(initialRating || 0)
+
+  // Adjust state while rendering when the prop changes, which React handles in
+  // the same pass — an effect here would cause an extra render.
+  const [prevInitialRating, setPrevInitialRating] = useState(initialRating)
+
+  if (initialRating !== prevInitialRating) {
+    setPrevInitialRating(initialRating)
+    setRating(initialRating || 0)
+  }
 
   const handleRating = (value) => {
     setRating(value)
@@ -11,10 +20,6 @@ const Rating = ({ initialRating, onRate }) => {
       onRate(value)
     }
   }
-
-  useEffect(() => {
-    setRating(initialRating || 0)
-  }, [initialRating])
 
   return (
     <div>

@@ -1,0 +1,15 @@
+{
+  "name": "lms",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Edemy LMS - React client + Express/MongoDB server",
+  "scripts": {
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "server": "npm --prefix server run server",
+    "client": "npm --prefix client run dev",
+    "dev": "concurrently -n server,client -c cyan,magenta \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

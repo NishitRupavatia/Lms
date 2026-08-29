@@ -9,6 +9,7 @@ import { clerkMiddleware } from '@clerk/express'
 import connectCloudinary from './configs/cloudinary.js'
 import courseRouter from './routes/courseRoute.js'
 import userRouter from './routes/userRoutes.js'
+import { UPLOAD_DIR } from './configs/multer.js'
 
 const app = express()
 
@@ -60,18 +61,30 @@ app.use(async (req, res, next) => {
     }
 })
 
-// Clerk Webhook Route (requires raw body for Svix signature verification)
+// Webhook routes need the raw body for signature verification, so they must be
+// registered BEFORE express.json() consumes and replaces the request body.
 app.post('/clerk', express.raw({ type: 'application/json' }), clerkWebHooks)
+app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks)
 
 // Standard JSON parser middleware for all subsequent routes
 app.use(express.json())
 
+// Thumbnails fall back to local disk when Cloudinary refuses the upload, so the
+// API serves them itself. Harmless when every thumbnail is on Cloudinary.
+app.use('/uploads', express.static(UPLOAD_DIR))
+
 // Default Route
 app.get('/', (req, res) => res.send("API working"))
 app.use('/api/educator', educatorRouter)
-app.use('/api/course',express.json(),courseRouter)
-app.use('/api/user',express.json(),userRouter)
-app.post('/stripe',express.raw({type:'application/json'}),stripeWebhooks)
+app.use('/api/course', courseRouter)
+app.use('/api/user', userRouter)
+
+// Central error handler so a thrown route error returns JSON instead of Express' HTML page
+app.use((error, req, res, next) => {
+    console.error('Unhandled error:', error)
+    if (res.headersSent) return next(error)
+    res.status(500).json({ success: false, message: safeMessage(error) })
+})
 // Only listen locally — on Vercel the exported app is invoked as a serverless function
 if (!process.env.VERCEL) {
     const PORT = process.env.PORT || 5000

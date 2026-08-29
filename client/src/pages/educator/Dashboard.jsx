@@ -1,20 +1,37 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useState } from 'react'
+import axios from 'axios'
+import { toast } from 'react-toastify'
 import { AppContext } from '../../context/AppContext'
-import { dummyDashboardData, assets } from '../../assets/assets'
+import { assets } from '../../assets/assets'
 import Loading from '../../components/student/Loading'
 
 const Dashboard = () => {
 
-  const { currency } = useContext(AppContext)
+  const { currency, backendUrl, authHeaders, isEducator } = useContext(AppContext)
   const [dashboardData, setDashboardData] = useState(null)
 
-  const fetchDashboardData = async () => {
-    setDashboardData(dummyDashboardData)
-  }
+  const fetchDashboardData = useCallback(async () => {
+    if (!isEducator) return
+
+    try {
+      const { data } = await axios.get(
+        `${backendUrl}/api/educator/dashboard`,
+        await authHeaders()
+      )
+
+      if (data.success) {
+        setDashboardData(data.dashboardData)
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message)
+    }
+  }, [isEducator, backendUrl, authHeaders])
 
   useEffect(() => {
     fetchDashboardData()
-  }, [])
+  }, [fetchDashboardData])
 
   return dashboardData ? (
 
@@ -105,6 +122,11 @@ const Dashboard = () => {
   </thead>
 
   <tbody className="text-sm text-gray-500">
+     {dashboardData.enrolledStudentsData.length === 0 && (
+       <tr>
+         <td colSpan={3} className="px-4 py-6 text-center">No enrollments yet</td>
+       </tr>
+     )}
      {dashboardData.enrolledStudentsData.map((item, index) => (
   <tr key={index} className="border-b border-gray-500/20">
     <td className="px-4 py-3 text-center hidden sm:table-cell">

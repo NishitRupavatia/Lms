@@ -23,7 +23,7 @@ const Navbar = () => {
       <div className='flex items-center gap-4 text-gray-600'>
 
         <p className='text-sm'>
-          Hi! {user?.fullName || 'Great Stack'}
+          Hi! {user?.fullName || user?.username || 'Educator'}
         </p>
 
         {user ? (
